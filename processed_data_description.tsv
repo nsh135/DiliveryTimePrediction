@@ -1,0 +1,12 @@
+TrainSetID	Fields	Description
+1	10	days = delivery_date-payment_date, forgot to add distance to x
+2	11	days = delivery_date-payment_date, added distance to x
+3	11	days = delivery_date-acceptance-date
+4	115	same as 3, added month,day,weekday(string, needs conversion to onehot),hour on acceptance day
+5	114	same as 4, remove declared_handling_days (caused some NAs)
+6	114	redo calculation of delivery days, some days from train set are negative
+7	77	keep month and day as numeric, add is_federal_holiday (0/1), near_federal_holiday ( within +7days to holiday)
+8	16	target encoding category_id, shipment_id, day, month, weekday
+9	77	same as 7, but month and day are target encoded
+10	78	same as 7, but add a column near_holiday_3 (3 days to holidays)
+11	TBD	same as 10, but keep significant features only

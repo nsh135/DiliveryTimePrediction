@@ -21,7 +21,9 @@ for gpu_instance in physical_devices:
 
 ## read only 5 rows
 nrows = None
-MIXED_INPUT = False # build a mixed input model to separared important features
+MIXED_INPUT = True # build a mixed input model to separared important features
+# important feature and onehot encoding features
+featureA = ['shipping_fee','carrier_min_estimate','carrier_max_estimate','item_price','quantity','weight','distance']
 
 
 def prepare_store_places(train_file):
@@ -129,7 +131,7 @@ def multi_input_model( X_train, featureA):
         x = Dense(256, activation="relu")(x)
         x = Model(inputs=inputA, outputs=x)
         # the second branch opreates on the second input
-        y = norm_layerA(inputB)
+        y = norm_layerB(inputB)
         y = Dense(1024, activation="relu")(y)
         y = Dense(512, activation="relu")(y)
         y = Dense(256, activation="relu")(y)
@@ -162,7 +164,12 @@ def model_train(model,X_train,y_train, n_epoch, batch_size):# fit the keras mode
     earlyStopping = tf.keras.callbacks.EarlyStopping(monitor='val_loss', patience=15, verbose=0, mode='min', restore_best_weights=True)
     mcp_save = tf.keras.callbacks.ModelCheckpoint(train_path+'ckps/ckpt.hdf5', save_best_only=True, monitor='val_loss', mode='min')
 
-    history  = model.fit(X_train, y_train, epochs=n_epoch, batch_size=batch_size, verbose=2, callbacks=[earlyStopping, mcp_save], validation_split=0.16)
+    if MIXED_INPUT:
+        train_data = [X_train[featureA], X_train[X_train.columns.difference(featureA)] ]
+    else:
+        train_data = X_train
+
+    history  = model.fit(train_data, y_train, epochs=n_epoch, batch_size=batch_size, verbose=2, callbacks=[earlyStopping, mcp_save], validation_split=0.16)
     
     model.save(train_path+'saved_model')
     
@@ -180,7 +187,11 @@ def evaluate(model, X_test, y_test): # evaluate the keras model
     """
     evaluate model based on mean sqr error
     """
-    y_pred = model.predict(X_test, batch_size=128000)[:,0].astype(int)
+    if MIXED_INPUT:
+        test_data = [X_test[featureA], X_test[X_test.columns.difference(featureA)] ]
+    else:
+        test_data = X_test    
+    y_pred = model.predict(test_data, batch_size=128000)[:,0].astype(int)
     y_test = y_test.to_numpy()
     LOSS = loss(y_test, y_pred)
     print('Evaluated result:', y_pred)
@@ -232,8 +243,7 @@ if __name__ == "__main__":
     print('\n',X_test.head().dtypes)
     print('\n',y_test.head().dtypes)
     
-    # important feature and onehot encoding features
-    featureA = list(X_train.columns)
+    
    
 
     # get the model

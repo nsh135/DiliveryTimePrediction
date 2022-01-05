@@ -13,10 +13,19 @@ python data_processing.py data/eBay_ML_Challenge_Dataset_2021/eBay_ML_Challenge_
 
 
 ## train and evaluate model
-CUDA_VISIBLE_DEVICES=1,2,3 python model_train.py --epoch 200 --batch_size 2048 --train_file 'data/processed_data/trainSet8.csv.gz'
+CUDA_VISIBLE_DEVICES=2,3 python model_train.py --epoch 200 --batch_size 4096 --train_file 'data/processed_data/trainSet10.csv.gz'
 
 # test previous dataset without training model again : include --test True 
 CUDA_VISIBLE_DEVICES=1,2,3 python model_train.py --epoch 200 --batch_size 2048 --train_file 'data/processed_data/trainSet7.csv.gz' --test True
 
 ## generate prediction
 python predict.py --train_dir train/TrainSet8 
+
+
+####### Dual input model
+# input is split into 2 , includings numeric important feature and onehot not important features
+# important features are defined in model_train_dual_input file: featureA=['']
+
+CUDA_VISIBLE_DEVICES=2,3 python model_train_dual_input.py --epoch 200 --batch_size 4096 --train_file 'data/processed_data/trainSet10.csv.gz'
+# predict
+python predict_dual_input.py 

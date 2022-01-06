@@ -13,6 +13,8 @@ import numpy as np
 from misc import loss, read_tsv
 import os
 import tensorflow.keras.backend as K
+from tensorflow.keras.layers import BatchNormalization
+
 
 physical_devices = tf.config.list_physical_devices('GPU') 
 for gpu_instance in physical_devices: 
@@ -126,22 +128,28 @@ def multi_input_model( X_train, featureA):
         inputB = Input(shape=(inputB_dim,))
         # the first branch operates on the first input
         x = norm_layerA(inputA)
-        x = Dense(1024, activation="relu")(x)
         x = Dense(512, activation="relu")(x)
+        x = BatchNormalization()(x)
         x = Dense(256, activation="relu")(x)
+        x = BatchNormalization()(x)
+        x = Dense(128, activation="relu")(x)
         x = Model(inputs=inputA, outputs=x)
         # the second branch opreates on the second input
         y = norm_layerB(inputB)
-        y = Dense(1024, activation="relu")(y)
         y = Dense(512, activation="relu")(y)
+        y = BatchNormalization()(y)
         y = Dense(256, activation="relu")(y)
+        y = BatchNormalization()(y)
+        y = Dense(128, activation="relu")(y)
         y = Model(inputs=inputB, outputs=y)
         # combine the output of the two branches
         combined = concatenate([x.output, y.output])
         # apply a FC layer and then a regression prediction on the
         # combined outputs
-        z = Dense(128, activation="relu")(combined)
-        z = Dense(64, activation="relu")(z)
+        z = Dense(64, activation="relu")(combined)
+        z = BatchNormalization()(z)
+        z = Dense(32, activation="relu")(z)
+        z = BatchNormalization()(z)
         z = Dense(1, activation="relu")(z)
         # our model will accept the inputs of the two branches and
         # then output a single value
@@ -161,7 +169,7 @@ def model_train(model,X_train,y_train, n_epoch, batch_size):# fit the keras mode
     Returns:
         model : keras model
     """
-    earlyStopping = tf.keras.callbacks.EarlyStopping(monitor='val_loss', patience=15, verbose=0, mode='min', restore_best_weights=True)
+    earlyStopping = tf.keras.callbacks.EarlyStopping(monitor='val_loss', patience=10, verbose=0, mode='min', restore_best_weights=True)
     mcp_save = tf.keras.callbacks.ModelCheckpoint(train_path+'ckps/ckpt.hdf5', save_best_only=True, monitor='val_loss', mode='min')
 
     if MIXED_INPUT:

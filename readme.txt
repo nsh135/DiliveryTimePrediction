@@ -28,4 +28,4 @@ python predict.py --train_dir train/TrainSet8
 
 CUDA_VISIBLE_DEVICES=2,3 python model_train_dual_input.py --epoch 200 --batch_size 4096 --train_file 'data/processed_data/trainSet10.csv.gz'
 # predict
-python predict_dual_input.py 
+python predict_dual_input.py --trainSetID 10

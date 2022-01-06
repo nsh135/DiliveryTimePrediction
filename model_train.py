@@ -159,7 +159,7 @@ def model_train(model,X_train,y_train, n_epoch, batch_size):# fit the keras mode
     Returns:
         model : keras model
     """
-    earlyStopping = tf.keras.callbacks.EarlyStopping(monitor='val_loss', patience=15, verbose=0, mode='min', restore_best_weights=True)
+    earlyStopping = tf.keras.callbacks.EarlyStopping(monitor='val_loss', patience=10, verbose=0, mode='min', restore_best_weights=True)
     mcp_save = tf.keras.callbacks.ModelCheckpoint(train_path+'ckps/ckpt.hdf5', save_best_only=True, monitor='val_loss', mode='min')
 
     history  = model.fit(X_train, y_train, epochs=n_epoch, batch_size=batch_size, verbose=2, callbacks=[earlyStopping, mcp_save], validation_split=0.16)

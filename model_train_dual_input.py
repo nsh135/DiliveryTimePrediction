@@ -14,6 +14,7 @@ from misc import loss, read_tsv
 import os
 import tensorflow.keras.backend as K
 from tensorflow.keras.layers import BatchNormalization
+from tensorflow.keras import regularizers
 
 
 physical_devices = tf.config.list_physical_devices('GPU') 
@@ -26,7 +27,7 @@ nrows = None
 MIXED_INPUT = True # build a mixed input model to separared important features
 # important feature and onehot encoding features
 featureA = ['shipping_fee','carrier_min_estimate','carrier_max_estimate','item_price','quantity','weight','distance']
-
+# featureA = ['carrier_max_estimate','distance']
 
 def prepare_store_places(train_file):
     #create train directory
@@ -69,7 +70,7 @@ def DNN_model(input_dim, n_layers,X_train=None):
             const_late = 0.6
             mask_early =  tf.cast(K.less(y_true, y_pred) , tf.float32)
             mask_late = tf.cast(K.less(y_pred, y_true) , tf.float32)
-            return const_early*K.mean( mask_early*(y_pred- y_true) ) + const_late * K.mean(mask_late*(y_true-y_pred) ) 
+            return K.mean(const_early* mask_early*(y_pred- y_true) + const_late * mask_late*(y_true-y_pred) )
 
         # define the keras model
         model = Sequential()
@@ -108,7 +109,7 @@ def multi_input_model( X_train, featureA):
             const_late = 0.6
             mask_early =  tf.cast(K.less(y_true, y_pred) , tf.float32)
             mask_late = tf.cast(K.less(y_pred, y_true) , tf.float32)
-            return const_early*K.mean( mask_early*(y_pred- y_true) ) + const_late * K.mean(mask_late*(y_true-y_pred) ) 
+            return K.mean(const_early* mask_early*(y_pred- y_true) + const_late * mask_late*(y_true-y_pred) ) 
          
          # define the keras model
         if X_train is not None: #if train_data is not none-> add normalization layer
@@ -128,34 +129,34 @@ def multi_input_model( X_train, featureA):
         inputB = Input(shape=(inputB_dim,))
         # the first branch operates on the first input
         x = norm_layerA(inputA)
-        x = Dense(512, activation="relu")(x)
+        x = Dense(512,kernel_regularizer=regularizers.l1_l2(l1=1e-5, l2=1e-4),bias_regularizer=regularizers.l2(1e-4),activity_regularizer=regularizers.l2(1e-5), activation="relu")(x)
         x = BatchNormalization()(x)
-        x = Dense(256, activation="relu")(x)
+        x = Dense(256,kernel_regularizer=regularizers.l1_l2(l1=1e-5, l2=1e-4),bias_regularizer=regularizers.l2(1e-4),activity_regularizer=regularizers.l2(1e-5), activation="relu")(x)
         x = BatchNormalization()(x)
-        x = Dense(128, activation="relu")(x)
+        x = Dense(128,kernel_regularizer=regularizers.l1_l2(l1=1e-5, l2=1e-4),bias_regularizer=regularizers.l2(1e-4),activity_regularizer=regularizers.l2(1e-5), activation="relu")(x)
         x = Model(inputs=inputA, outputs=x)
         # the second branch opreates on the second input
         y = norm_layerB(inputB)
-        y = Dense(512, activation="relu")(y)
+        y = Dense(1024,kernel_regularizer=regularizers.l1_l2(l1=1e-5, l2=1e-4),bias_regularizer=regularizers.l2(1e-4),activity_regularizer=regularizers.l2(1e-5), activation="relu")(y)
         y = BatchNormalization()(y)
-        y = Dense(256, activation="relu")(y)
+        y = Dense(512,kernel_regularizer=regularizers.l1_l2(l1=1e-5, l2=1e-4),bias_regularizer=regularizers.l2(1e-4),activity_regularizer=regularizers.l2(1e-5), activation="relu")(y)
         y = BatchNormalization()(y)
-        y = Dense(128, activation="relu")(y)
+        y = Dense(256,kernel_regularizer=regularizers.l1_l2(l1=1e-5, l2=1e-4),bias_regularizer=regularizers.l2(1e-4),activity_regularizer=regularizers.l2(1e-5), activation="relu")(y)
         y = Model(inputs=inputB, outputs=y)
         # combine the output of the two branches
         combined = concatenate([x.output, y.output])
         # apply a FC layer and then a regression prediction on the
         # combined outputs
-        z = Dense(64, activation="relu")(combined)
+        z = Dense(128,kernel_regularizer=regularizers.l1_l2(l1=1e-5, l2=1e-4),bias_regularizer=regularizers.l2(1e-4),activity_regularizer=regularizers.l2(1e-5), activation="relu")(combined)
         z = BatchNormalization()(z)
-        z = Dense(32, activation="relu")(z)
+        z = Dense(64,kernel_regularizer=regularizers.l1_l2(l1=1e-5, l2=1e-4),bias_regularizer=regularizers.l2(1e-4),activity_regularizer=regularizers.l2(1e-5), activation="relu")(z)
         z = BatchNormalization()(z)
         z = Dense(1, activation="relu")(z)
         # our model will accept the inputs of the two branches and
         # then output a single value
         model = Model(inputs=[x.input, y.input], outputs=z)
         model.compile(loss=ebay_loss,
-                        optimizer=tf.keras.optimizers.Adam(0.001))
+                        optimizer=tf.keras.optimizers.Adam(0.0002))
     return model
 
 def model_train(model,X_train,y_train, n_epoch, batch_size):# fit the keras model on the dataset
@@ -177,8 +178,8 @@ def model_train(model,X_train,y_train, n_epoch, batch_size):# fit the keras mode
     else:
         train_data = X_train
 
-    history  = model.fit(train_data, y_train, epochs=n_epoch, batch_size=batch_size, verbose=2, callbacks=[earlyStopping, mcp_save], validation_split=0.16)
-    
+    y_train = y_train.to_numpy().reshape((-1))
+    history  = model.fit(train_data, y_train, epochs=n_epoch, batch_size=batch_size, verbose=2, callbacks=[earlyStopping, mcp_save], validation_split=0.20)
     model.save(train_path+'saved_model')
     
     ##save training loss to figure
@@ -191,6 +192,8 @@ def model_train(model,X_train,y_train, n_epoch, batch_size):# fit the keras mode
     plt.close(fig) 
     return model
 
+
+
 def evaluate(model, X_test, y_test): # evaluate the keras model
     """
     evaluate model based on mean sqr error
@@ -200,12 +203,19 @@ def evaluate(model, X_test, y_test): # evaluate the keras model
     else:
         test_data = X_test    
     y_pred = model.predict(test_data, batch_size=128000)[:,0].astype(int)
-    y_test = y_test.to_numpy()
+    y_test = y_test.to_numpy().reshape((-1))
+    print("y_test", y_test)
+    print("y_pred", y_pred)
+
+    print("Test with python loss")
     LOSS = loss(y_test, y_pred)
     print('Evaluated result:', y_pred)
     print("LOSS:", LOSS)
-    np.savetxt(train_path+'logs/LOSS.out', LOSS ) 
+    np.savetxt(train_path+'logs/LOSS.out', [LOSS] ) 
     np.savetxt(train_path+'logs/y_pred.out', y_pred ) 
+
+    # print("test with tensorflow loss")
+    # print("EBAY TENSORFLOW LOSS: ",ebay_loss(y_test,y_pred))
     return y_pred
 
 
@@ -257,8 +267,10 @@ if __name__ == "__main__":
     # get the model
     if args.test:
         print("Testing only, loading model from {}saved_model".format(train_path))
-        model = tf.keras.models.load_model(train_path + "saved_model", compile=False)
-        # model = tf.keras.models.load_model(train_path + "ckps/" + '.mdl_wts.hdf5', compile=False)
+        #load from final model
+        # model = tf.keras.models.load_model(train_path + "saved_model", compile=False)
+        #load from checkpoint
+        model = tf.keras.models.load_model(train_path + "ckps/" + 'ckpt.hdf5', compile=False)
     else:
         # Build a new DNN model
         if MIXED_INPUT: #build model with separated emphasized feature inputs 
@@ -278,14 +290,15 @@ if __name__ == "__main__":
     print("Start evaluation ..... ")
     y_pred = evaluate(model, X_test, y_test) 
     print("Done Evaluation.")
-
+    print("y_test", y_test['target_from_order_placement'].to_numpy())
+    print("y_pred", y_pred)
     #make corrolation matrix to analize
     if not  args.test:
         y_pred_df = pd.DataFrame(y_pred, columns=['y_pred'])
-        print("y_test", y_test['target_from_order_placement'].to_numpy())
-        print("y_pred", y_pred)
         err_df = pd.DataFrame(y_pred-y_test['target_from_order_placement'].to_numpy(), columns=['error'])
         X_test = pd.concat([X_test, y_test['target_from_order_placement'], y_pred_df,err_df], axis=1) 
         corr = X_test.corr()
         corr.to_csv(train_path + 'logs/corr_matrix.csv', index=False)
+
+    
 

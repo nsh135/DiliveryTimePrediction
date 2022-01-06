@@ -27,7 +27,6 @@ nrows = None
 MIXED_INPUT = True # build a mixed input model to separared important features
 # important feature and onehot encoding features
 featureA = ['shipping_fee','carrier_min_estimate','carrier_max_estimate','item_price','quantity','weight','distance']
-# featureA = ['carrier_max_estimate','distance']
 
 def prepare_store_places(train_file):
     #create train directory
@@ -136,7 +135,8 @@ def multi_input_model( X_train, featureA):
         x = Dense(128,kernel_regularizer=regularizers.l1_l2(l1=1e-5, l2=1e-4),bias_regularizer=regularizers.l2(1e-4),activity_regularizer=regularizers.l2(1e-5), activation="relu")(x)
         x = Model(inputs=inputA, outputs=x)
         # the second branch opreates on the second input
-        y = norm_layerB(inputB)
+        # y = norm_layerB(inputB)  ##### no normalization on these features
+        y = inputB
         y = Dense(1024,kernel_regularizer=regularizers.l1_l2(l1=1e-5, l2=1e-4),bias_regularizer=regularizers.l2(1e-4),activity_regularizer=regularizers.l2(1e-5), activation="relu")(y)
         y = BatchNormalization()(y)
         y = Dense(512,kernel_regularizer=regularizers.l1_l2(l1=1e-5, l2=1e-4),bias_regularizer=regularizers.l2(1e-4),activity_regularizer=regularizers.l2(1e-5), activation="relu")(y)
@@ -156,7 +156,7 @@ def multi_input_model( X_train, featureA):
         # then output a single value
         model = Model(inputs=[x.input, y.input], outputs=z)
         model.compile(loss=ebay_loss,
-                        optimizer=tf.keras.optimizers.Adam(0.0002))
+                        optimizer=tf.keras.optimizers.Adam(0.001))
     return model
 
 def model_train(model,X_train,y_train, n_epoch, batch_size):# fit the keras model on the dataset
@@ -170,7 +170,7 @@ def model_train(model,X_train,y_train, n_epoch, batch_size):# fit the keras mode
     Returns:
         model : keras model
     """
-    earlyStopping = tf.keras.callbacks.EarlyStopping(monitor='val_loss', patience=10, verbose=0, mode='min', restore_best_weights=True)
+    earlyStopping = tf.keras.callbacks.EarlyStopping(monitor='val_loss', patience=5, verbose=0, mode='min', restore_best_weights=True)
     mcp_save = tf.keras.callbacks.ModelCheckpoint(train_path+'ckps/ckpt.hdf5', save_best_only=True, monitor='val_loss', mode='min')
 
     if MIXED_INPUT:
@@ -202,7 +202,7 @@ def evaluate(model, X_test, y_test): # evaluate the keras model
         test_data = [X_test[featureA], X_test[X_test.columns.difference(featureA)] ]
     else:
         test_data = X_test    
-    y_pred = model.predict(test_data, batch_size=128000)[:,0].astype(int)
+    y_pred = np.rint(model.predict(test_data, batch_size=128000)[:,0])
     y_test = y_test.to_numpy().reshape((-1))
     print("y_test", y_test)
     print("y_pred", y_pred)
@@ -297,6 +297,7 @@ if __name__ == "__main__":
         y_pred_df = pd.DataFrame(y_pred, columns=['y_pred'])
         err_df = pd.DataFrame(y_pred-y_test['target_from_order_placement'].to_numpy(), columns=['error'])
         X_test = pd.concat([X_test, y_test['target_from_order_placement'], y_pred_df,err_df], axis=1) 
+        X_test.to_csv(train_path + 'logs/test_error.csv', index=False)
         corr = X_test.corr()
         corr.to_csv(train_path + 'logs/corr_matrix.csv', index=False)
 

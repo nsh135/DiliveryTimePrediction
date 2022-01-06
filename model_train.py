@@ -181,7 +181,7 @@ def evaluate(model, X_test, y_test): # evaluate the keras model
     """
     evaluate model based on mean sqr error
     """
-    y_pred = model.predict(X_test, batch_size=128000)[:,0].astype(int)
+    y_pred = np.rint(model.predict(X_test, batch_size=128000)[:,0])
     y_test = y_test.to_numpy()
     LOSS = loss(y_test, y_pred)
     print('Evaluated result:', y_pred)

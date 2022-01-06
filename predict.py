@@ -35,7 +35,7 @@ if __name__=='__main__':
     print("Test data shape:", x.shape)
     # predict in days
     print("predicting ...")
-    days = model.predict(x, batch_size = 4096)[:,0].astype(int)
+    days = numpy.rint(model.predict(x, batch_size = 4096)[:,0])
     print("!!!!Predicted values: ", days)
     # convert days to date
     print("converting days to dates ... ")

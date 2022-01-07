@@ -3,7 +3,7 @@
 
 import pandas as pd
 import sys, pickle, tqdm
-from preprocessing import convert11 as convert
+from preprocessing import convert12 as convert
 from misc import read_tsv
 
 pd.set_option('display.max_columns', None)

@@ -54,12 +54,13 @@ def find_date_range():
 
 
 if __name__ == "__main__":
-    means_shipment, means_category, means_day, means_month, means_weekday, means_hour = targetEncoding_findMean()
-    print(means_category)
-    print(means_shipment)
-    print(means_day)
-    print(means_month)
-    print(means_weekday)
-    print(means_hour)
-    with open('preprocessing/category_means.pkl', 'wb') as file:
-        pickle.dump((means_shipment, means_category, means_day, means_month, means_weekday, means_hour), file)
+    find_date_range()
+    # means_shipment, means_category, means_day, means_month, means_weekday, means_hour = targetEncoding_findMean()
+    # print(means_category)
+    # print(means_shipment)
+    # print(means_day)
+    # print(means_month)
+    # print(means_weekday)
+    # print(means_hour)
+    # with open('preprocessing/category_means.pkl', 'wb') as file:
+    #     pickle.dump((means_shipment, means_category, means_day, means_month, means_weekday, means_hour), file)

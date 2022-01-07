@@ -10,3 +10,4 @@ TrainSetID	Fields	Description
 9	77	same as 7, but month and day are target encoded
 10	78	same as 7, but add a column near_holiday_3 (3 days to holidays)
 11	TBD	same as 10, but keep significant features only
+12	121	same as 10, one hot encode day, month, year

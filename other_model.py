@@ -75,9 +75,13 @@ if __name__ == "__main__":
     scaler.fit(X)
     X = scaler.transform(X)
 
+    # train on full set
+    xgb = XGBRegressor(n_jobs=30, tree_method='gpu_hist', gamma=6, learning_rate=0.15, n_estimators=140, reg_alpha=0.2)
+    xgb.fit(X, y)
+
     # Cross-validation ... 
-    print("Cross-validation ....")
-    tuneParams(X, y)
+    # print("Cross-validation ....")
+    # tuneParams(X, y)
     # # save model
     # with open("train/RF_trained.pkl", 'wb') as file:
     #     pickle.dump(pipeline, file)
@@ -86,27 +90,27 @@ if __name__ == "__main__":
     # loss_test = loss(y_test['target_from_order_placement'].tolist(), y_test_pred.tolist())
     # print('loss on test set: ', loss_test)
 
-    # print("predicting .... ")
-    # print("reading data file ... ")
-    # # load data and process
-    # convert = importlib.import_module('preprocessing.convert'+args.trainSetID)
-    # df = read_tsv("data/eBay_ML_Challenge_Dataset_2021/eBay_ML_Challenge_Dataset_2021_quiz.tsv", nrows=nrows)
-    # x, _, record_number = convert.process(df, no_target=True, record_number=True)
-    # print("Test data shape:", x.shape)
-    # # predict in days
-    # print("predicting ...")
-    # y_pred = pipeline.predict(x)
-    # y_pred = np.nan_to_num(y_pred, nan=3)
-    # days = numpy.rint(y_pred)
-    # print("!!!!Predicted values: ", days)
-    # # convert days to date
-    # print("converting days to dates ... ")
-    # delivery_dates = convert.delivery_days_to_date(df, days)
-    # prediction_df = pd.concat([record_number,delivery_dates], axis=1)
-    # print(prediction_df.head())
-    # # write file according to requirements
-    # print("writing output ... ")
-    # prediction_df.to_csv("submissions/xgboost.tsv.gz".format(args.trainSetID), sep='\t', index=False, header=False, compression='gzip')
+    print("predicting .... ")
+    print("reading data file ... ")
+    # load data and process
+    convert = importlib.import_module('preprocessing.convert'+args.trainSetID)
+    df = read_tsv("data/eBay_ML_Challenge_Dataset_2021/eBay_ML_Challenge_Dataset_2021_quiz.tsv", nrows=None)
+    x, _, record_number = convert.process(df, no_target=True, record_number=True)
+    print("Test data shape:", x.shape)
+    # predict in days
+    print("predicting ...")
+    x = scaler.transform(x)
+    y_pred = xgb.predict(x)
+    days = numpy.rint(y_pred)
+    print("!!!!Predicted values: ", days)
+    # convert days to date
+    print("converting days to dates ... ")
+    delivery_dates = convert.delivery_days_to_date(df, days)
+    prediction_df = pd.concat([record_number,delivery_dates], axis=1)
+    print(prediction_df.head())
+    # write file according to requirements
+    print("writing output ... ")
+    prediction_df.to_csv("submissions/xgboost.tsv.gz".format(args.trainSetID), sep='\t', index=False, header=False, compression='gzip')
 
     
 

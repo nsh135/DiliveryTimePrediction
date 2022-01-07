@@ -163,7 +163,7 @@ def multi_input_model( X_train, featureA):
         # then output a single value
         model = Model(inputs=[x.input, y.input], outputs=z)
         model.compile(loss=ebay_loss,
-                        optimizer=tf.keras.optimizers.Adam(0.0002))
+                        optimizer=tf.keras.optimizers.Adam(0.0005))
     return model
 
 def model_train(model,X_train,y_train, n_epoch, batch_size):# fit the keras model on the dataset
@@ -173,7 +173,6 @@ def model_train(model,X_train,y_train, n_epoch, batch_size):# fit the keras mode
         model ([type]): linear regression model
         n_epoch (int): num of epochs
         batch_size: batch size
-
     Returns:
         model : keras model
     """
@@ -362,6 +361,3 @@ if __name__ == "__main__":
         X_test.head(10000).to_csv(train_path + 'logs/errors.csv')
         corr = X_test.corr()
         corr.to_csv(train_path + 'logs/corr_matrix.csv', index=False)
-
-    
-

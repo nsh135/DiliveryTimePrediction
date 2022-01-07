@@ -3,6 +3,7 @@ import swifter, pickle
 import pandas.tseries.holiday
 import pandas as pd
 from tqdm import tqdm
+import numpy as np
 
 #Read data from tsv
 def read_tsv(tsv_file, nrows=None):
@@ -20,6 +21,7 @@ def read_tsv(tsv_file, nrows=None):
 
 
 def loss(y_true, y_pred):
+    y_true = np.array(y_true); y_pred = np.array(y_pred)
     assert len(y_true)==len(y_pred)
     N = len(y_true)
     Sum = 0

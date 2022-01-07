@@ -30,7 +30,7 @@ nrows = None
 use_xgboost = False
 MIXED_INPUT = True # build a mixed input model to separared important features
 # important feature and onehot encoding features
-featureA = ['shipping_fee','carrier_min_estimate','carrier_max_estimate','item_price','quantity','weight','distance']
+# featureA = ['shipping_fee','carrier_min_estimate','carrier_max_estimate','item_price','quantity','weight','distance']
 
 def prepare_store_places(train_file):
     #create train directory
@@ -53,37 +53,43 @@ def csv2df(csv_file):
 	return df
 
 def autoencoder(input_dim, encoding_dim, X_train):
+    norm_layer = tf.keras.layers.experimental.preprocessing.Normalization(axis=-1)
+    norm_layer.adapt(X_train.to_numpy())
     # This is our input image
     input_img = Input(shape=(input_dim,))
+    # h0 = norm_layer(input_img)
     h1 =  Dense(512, activation='relu')(input_img)
+    # h1 = BatchNormalization()(h1)
     h2 =  Dense(256, activation='relu')(h1)
-    h2 = BatchNormalization()(h2)
+    # h2 = BatchNormalization()(h2)
     h3 =  Dense(128, activation='relu')(h2)
-    h3 = BatchNormalization()(h3)
+    # h3 = BatchNormalization()(h3)
     # "encoded" is the encoded representation of the input
     encoded = Dense(encoding_dim, activation='relu', name='encoded')(h3)
     h4 =  Dense(128, activation='relu')(encoded)
-    h4 = BatchNormalization()(h4)
+    # h4 = BatchNormalization()(h4)
     h5 =  Dense(256, activation='relu')(h4)
-    h5 = BatchNormalization()(h5)
+    # h5 = BatchNormalization()(h5)
     h6 =  Dense(512, activation='relu')(h5)
+    # h6 = BatchNormalization()(h6)
     # "decoded" is the lossy reconstruction of the input
     decoded = Dense(input_dim, activation='linear')(h6)
+    # decoded = norm_layer(decoded)
     # This model maps an input to its reconstruction
     autoencoder = Model(input_img, decoded)
-    autoencoder.compile(optimizer='adam', loss='mean_squared_error')
+    autoencoder.compile(optimizer='adam', loss=tf.keras.losses.MeanSquaredLogarithmicError(
+            reduction="sum_over_batch_size", name="mean_squared_logarithmic_error"))
     print("Autoencoder: ", autoencoder.summary())
     return autoencoder
 
-def autoencoder_train(train_data,embedding_dim, n_epoch=200, batch_size=40000):# fit the keras model on the dataset
+def autoencoder_train(train_data,embedding_dim, n_epoch=200, batch_size=1000):# fit the keras model on the dataset
     """return encoder model"""
-    earlyStopping = tf.keras.callbacks.EarlyStopping(monitor='val_loss', patience=10, verbose=0, mode='min', restore_best_weights=True)
-    mcp_save = tf.keras.callbacks.ModelCheckpoint(train_path+'ckps/autoencoder.hdf5', save_best_only=True, monitor='val_loss', mode='min')
-
+    
     input_dim = len(train_data.columns)
     strategy = tf.distribute.MirroredStrategy()
-    print('---Number of devices: {}'.format(strategy.num_replicas_in_sync))
     with strategy.scope():
+        earlyStopping = tf.keras.callbacks.EarlyStopping(monitor='val_loss', patience=10, verbose=0, mode='min', restore_best_weights=True)
+        mcp_save = tf.keras.callbacks.ModelCheckpoint(train_path+'ckps/autoencoder.hdf5', save_best_only=True, monitor='val_loss', mode='min')
         model = autoencoder(input_dim= input_dim, encoding_dim=embedding_dim, X_train=train_data)
 
     history  = model.fit(train_data, train_data, epochs=n_epoch, batch_size=batch_size, verbose=2, callbacks=[earlyStopping, mcp_save], validation_split=0.20)
@@ -125,8 +131,6 @@ def multi_input_model( X_train,X_embeddings, featureA):
             norm_layerB = tf.keras.layers.experimental.preprocessing.Normalization(axis=-1)
             norm_layerB.adapt(X_embeddings)
 
-        
-
         inputA_dim  = len(featureA)  
         inputB_dim = X_embeddings.shape[1]
         print("---DEBUG: inputA dim : ", inputA_dim)
@@ -166,7 +170,7 @@ def multi_input_model( X_train,X_embeddings, featureA):
         # then output a single value
         model = Model(inputs=[x.input, y.input], outputs=z)
         model.compile(loss=ebay_loss,
-                        optimizer=tf.keras.optimizers.Adam(0.0002))
+                        optimizer=tf.keras.optimizers.Adam(0.0005))
     return model
 
 def model_train(model,X_train,X_embeddings,y_train, n_epoch, batch_size):# fit the keras model on the dataset
@@ -208,7 +212,7 @@ def evaluate(model,encoder_model,  X_test, y_test): # evaluate the keras model
     X_test_embeddings = encoder_model.predict(X_test)
     test_data = [X_test[featureA], X_test_embeddings ]
   
-    y_pred = np.rint(model.predict(test_data, batch_size=128000)[:,0])
+    y_pred = np.rint(model.predict(test_data, batch_size=12800)[:,0])
     y_test = y_test.to_numpy().reshape((-1))
     print("y_test", y_test)
     print("y_pred", y_pred)
@@ -252,11 +256,14 @@ if __name__ == "__main__":
     #prepare dataset   
     # split to train and test 
     print("splitting data ... ")
-    train, test = train_test_split(df, test_size=0.20, shuffle=True, random_state=10)
+    train, test = train_test_split(df, test_size=0.34, shuffle=True, random_state=10)
     X_train = train.loc[:, train.columns != 'target_from_order_placement']
     y_train = train[['target_from_order_placement']]
     X_test = test.loc[:, test.columns != 'target_from_order_placement']
     y_test = test[['target_from_order_placement']]
+
+    global featureA 
+    featureA = X_train.columns
 
     # show data samples
     print("data samples and data types !!!!")
@@ -266,15 +273,26 @@ if __name__ == "__main__":
     print('\n',y_test.head().dtypes)
     
     ### read quiz 
-    convert = importlib.import_module('preprocessing.convert'+args.trainSetID)
-    df_quiz = read_tsv("data/eBay_ML_Challenge_Dataset_2021/eBay_ML_Challenge_Dataset_2021_quiz.tsv", nrows=nrows)
-    x, _, record_number = convert.process(df_quiz, no_target=True, record_number=True)
-    big_X_train = pd.concat([ x,X_train],axis=0) #concatenate X_train and quiz
-    # print("--- Need top uncomment and change Xtest to x")
+    quiz_cache = 'data/processed_data/x_record_number_quiz_convert_{}.pkl'.format(args.trainSetID)
+    if os.path.exists(quiz_cache):
+        with open(quiz_cache, 'rb') as handle:
+            x,record_number = pickle.load(handle)
+    else:
+        convert = importlib.import_module('preprocessing.convert'+args.trainSetID)
+        df_quiz = read_tsv("data/eBay_ML_Challenge_Dataset_2021/eBay_ML_Challenge_Dataset_2021_quiz.tsv", nrows=nrows)
+        x, _, record_number = convert.process(df_quiz, no_target=True, record_number=True)
+        with open(quiz_cache, 'wb') as handle:
+            pickle.dump((x,record_number), handle)
 
+    big_X_train = pd.concat([ X_train, x],axis=0) #concatenate X_train and quiz
+    # scaler = StandardScaler()
+    # big_X_train = pd.DataFrame(scaler.fit_transform(big_X_train))
+    # big_X_train= (big_X_train-big_X_train.mean())/big_X_train.std()
+    print("---big_X_train :",big_X_train.shape )
+    # print("--- Need top uncomment and change Xtest to x")
     # Get auto encoder 
     if args.train_autoencoder:
-        autoencoder = autoencoder_train(big_X_train,embedding_dim=32, n_epoch=300, batch_size=40000)
+        autoencoder = autoencoder_train(pd.concat([ X_train.head(50000), x.head(150000)],axis=0),embedding_dim=32, n_epoch=300, batch_size=4000)
     else: 
         autoencoder = tf.keras.models.load_model(train_path + "ckps/" + 'autoencoder.hdf5', compile=False)
 
@@ -290,8 +308,8 @@ if __name__ == "__main__":
         #load from checkpoint
         # model = tf.keras.models.load_model(train_path + "ckps/" + 'ckpt.hdf5', compile=False)
     else:
-        big_X_embeddings = encoder.predict(big_X_train)
-        X_embeddings = encoder.predict(X_train)
+        big_X_embeddings = encoder.predict(big_X_train,  batch_size = 200000)
+        X_embeddings = encoder.predict(X_train,  batch_size = 200000)
         print("---big_X_embeddings.shape", big_X_embeddings.shape)
         print("---X_embeddings.shape", X_embeddings.shape)
             # Build a new DNN model
@@ -312,7 +330,7 @@ if __name__ == "__main__":
         df = read_tsv("data/eBay_ML_Challenge_Dataset_2021/eBay_ML_Challenge_Dataset_2021_quiz.tsv", nrows=nrows)
         x, _, record_number = convert.process(df, no_target=True, record_number=True)
         print("Test data shape:", x.shape)
-        x_embeddings = encoder.predict(x)
+        x_embeddings = encoder.predict(x,  batch_size = 200000)
         x_quiz = [x[featureA], x_embeddings ] 
         # predict in days
         print("predicting ...")

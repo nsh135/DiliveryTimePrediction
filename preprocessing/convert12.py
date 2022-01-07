@@ -168,13 +168,13 @@ def delivery_days_to_date(df, days) -> List:
     
 
 feature_names = ['b2c_c2c', 'shipment_method_id', 'shipping_fee', 'carrier_min_estimate', 'carrier_max_estimate', 'category_id', 'item_price', 'quantity', 'weight', 'distance', 'year', 'month', 'day', 'weekday', 'hour', 'is_holiday', 'near_holiday_7', 'near_holiday_3']
-features_need_onehot = ['shipment_method_id','category_id', 'weekday', 'year', 'month', 'day']
+features_need_onehot = ['shipment_method_id','category_id', 'weekday', 'year', 'month',]
 onehot_categories = {
     'shipment_method_id': list(range(27)),
     'category_id': list(range(33)),
     'year': [2016, 2017, 2018, 2019, 2020],
     'month': list(range(1,13)),
-    'day': list(range(1,32)),
+    # 'day': list(range(1,32)),
     'weekday': ['Mon', 'Tue', 'Wed', 'Thu', 'Fri','Sat', 'Sun'],
 }
 

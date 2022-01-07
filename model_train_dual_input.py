@@ -15,6 +15,9 @@ import os
 import tensorflow.keras.backend as K
 from tensorflow.keras.layers import BatchNormalization
 from tensorflow.keras import regularizers
+from sklearn.preprocessing import StandardScaler
+from sklearn.pipeline import Pipeline
+from xgboost import XGBRegressor
 
 
 physical_devices = tf.config.list_physical_devices('GPU') 
@@ -23,7 +26,8 @@ for gpu_instance in physical_devices:
 
 
 ## read only 5 rows
-nrows = None
+nrows = 100
+use_xgboost = True
 MIXED_INPUT = True # build a mixed input model to separared important features
 # important feature and onehot encoding features
 featureA = ['shipping_fee','carrier_min_estimate','carrier_max_estimate','item_price','quantity','weight','distance']
@@ -128,20 +132,19 @@ def multi_input_model( X_train, featureA):
         inputB = Input(shape=(inputB_dim,))
         # the first branch operates on the first input
         x = norm_layerA(inputA)
-        x = Dense(512,kernel_regularizer=regularizers.l1_l2(l1=1e-5, l2=1e-4),bias_regularizer=regularizers.l2(1e-4),activity_regularizer=regularizers.l2(1e-5), activation="relu")(x)
+        x = Dense(64,kernel_regularizer=regularizers.l1_l2(l1=1e-5, l2=1e-4),bias_regularizer=regularizers.l2(1e-4),activity_regularizer=regularizers.l2(1e-5), activation="relu")(x)
         x = BatchNormalization()(x)
-        x = Dense(256,kernel_regularizer=regularizers.l1_l2(l1=1e-5, l2=1e-4),bias_regularizer=regularizers.l2(1e-4),activity_regularizer=regularizers.l2(1e-5), activation="relu")(x)
+        x = Dense(32,kernel_regularizer=regularizers.l1_l2(l1=1e-5, l2=1e-4),bias_regularizer=regularizers.l2(1e-4),activity_regularizer=regularizers.l2(1e-5), activation="relu")(x)
         x = BatchNormalization()(x)
-        x = Dense(128,kernel_regularizer=regularizers.l1_l2(l1=1e-5, l2=1e-4),bias_regularizer=regularizers.l2(1e-4),activity_regularizer=regularizers.l2(1e-5), activation="relu")(x)
+        x = Dense(16,kernel_regularizer=regularizers.l1_l2(l1=1e-5, l2=1e-4),bias_regularizer=regularizers.l2(1e-4),activity_regularizer=regularizers.l2(1e-5), activation="relu")(x)
         x = Model(inputs=inputA, outputs=x)
         # the second branch opreates on the second input
-        # y = norm_layerB(inputB)  ##### no normalization on these features
-        y = inputB
-        y = Dense(1024,kernel_regularizer=regularizers.l1_l2(l1=1e-5, l2=1e-4),bias_regularizer=regularizers.l2(1e-4),activity_regularizer=regularizers.l2(1e-5), activation="relu")(y)
+        y = norm_layerB(inputB)  ##### no normalization on these features
+        y = Dense(64,kernel_regularizer=regularizers.l1_l2(l1=1e-5, l2=1e-4),bias_regularizer=regularizers.l2(1e-4),activity_regularizer=regularizers.l2(1e-5), activation="relu")(y)
         y = BatchNormalization()(y)
-        y = Dense(512,kernel_regularizer=regularizers.l1_l2(l1=1e-5, l2=1e-4),bias_regularizer=regularizers.l2(1e-4),activity_regularizer=regularizers.l2(1e-5), activation="relu")(y)
+        y = Dense(32,kernel_regularizer=regularizers.l1_l2(l1=1e-5, l2=1e-4),bias_regularizer=regularizers.l2(1e-4),activity_regularizer=regularizers.l2(1e-5), activation="relu")(y)
         y = BatchNormalization()(y)
-        y = Dense(256,kernel_regularizer=regularizers.l1_l2(l1=1e-5, l2=1e-4),bias_regularizer=regularizers.l2(1e-4),activity_regularizer=regularizers.l2(1e-5), activation="relu")(y)
+        y = Dense(16,kernel_regularizer=regularizers.l1_l2(l1=1e-5, l2=1e-4),bias_regularizer=regularizers.l2(1e-4),activity_regularizer=regularizers.l2(1e-5), activation="relu")(y)
         y = Model(inputs=inputB, outputs=y)
         # combine the output of the two branches
         combined = concatenate([x.output, y.output])
@@ -149,14 +152,14 @@ def multi_input_model( X_train, featureA):
         # combined outputs
         z = Dense(128,kernel_regularizer=regularizers.l1_l2(l1=1e-5, l2=1e-4),bias_regularizer=regularizers.l2(1e-4),activity_regularizer=regularizers.l2(1e-5), activation="relu")(combined)
         z = BatchNormalization()(z)
-        z = Dense(64,kernel_regularizer=regularizers.l1_l2(l1=1e-5, l2=1e-4),bias_regularizer=regularizers.l2(1e-4),activity_regularizer=regularizers.l2(1e-5), activation="relu")(z)
+        z = Dense(64,kernel_regularizer=regularizers.l1_l2(l1=1e-5, l2=1e-4),bias_regularizer=regularizers.l2(1e-4),activity_regularizer=regularizers.l2(1e-5),activation="relu")(z)
         z = BatchNormalization()(z)
         z = Dense(1, activation="relu")(z)
         # our model will accept the inputs of the two branches and
         # then output a single value
         model = Model(inputs=[x.input, y.input], outputs=z)
         model.compile(loss=ebay_loss,
-                        optimizer=tf.keras.optimizers.Adam(0.001))
+                        optimizer=tf.keras.optimizers.Adam(0.0005))
     return model
 
 def model_train(model,X_train,y_train, n_epoch, batch_size):# fit the keras model on the dataset
@@ -212,10 +215,6 @@ def evaluate(model, X_test, y_test): # evaluate the keras model
     print('Evaluated result:', y_pred)
     print("LOSS:", LOSS)
     np.savetxt(train_path+'logs/LOSS.out', [LOSS] ) 
-    np.savetxt(train_path+'logs/y_pred.out', y_pred ) 
-
-    # print("test with tensorflow loss")
-    # print("EBAY TENSORFLOW LOSS: ",ebay_loss(y_test,y_pred))
     return y_pred
 
 
@@ -243,7 +242,6 @@ if __name__ == "__main__":
     df = df.dropna()
     print("shape after drop NA: ", df.shape)
     
-    # onehot encoding is done in data_processing
 
     #prepare dataset   
     # split to train and test 
@@ -287,17 +285,33 @@ if __name__ == "__main__":
     print("Data types after onehot")
     print('\n',X_test.head().dtypes)
     #evaluation 
-    print("Start evaluation ..... ")
+    print("Start evaluation Deep NN model ..... ")
     y_pred = evaluate(model, X_test, y_test) 
     print("Done Evaluation.")
-    print("y_test", y_test['target_from_order_placement'].to_numpy())
-    print("y_pred", y_pred)
+
+    if use_xgboost and  args.test:
+        print("Training XGBOOST")
+        xgbregressor = XGBRegressor(objective ='reg:linear', colsample_bytree = 0.3, learning_rate = 0.1,max_depth = 5, alpha = 10, n_estimators = 20, n_jobs=10)
+        pipeline = Pipeline([('scaler', StandardScaler()), ('XGB',xgbregressor)])
+        pipeline.fit(X_train, y_train)
+        y_test_pred = np.rint(pipeline.predict(X_test))
+        xgb_loss = loss(y_test['target_from_order_placement'].tolist(), y_test_pred.tolist())
+        print("XGBOOST loss:", xgb_loss)
+        np.savetxt(train_path+'logs/xgb_loss.out', [xgb_loss] ) 
+        print("Done Evaluation.")
+
+        print("Ensemble deepNN and Xgboost ..... ")
+        ensemble_loss = loss(y_test['target_from_order_placement'].tolist(), np.rint((y_test_pred+y_pred)/2) )
+        print("ensemble loss :", ensemble_loss)
+        np.savetxt(train_path+'logs/ensemble_loss.out', [ensemble_loss] ) 
+        print("Done Evaluation.")
+
+
     #make corrolation matrix to analize
-    if not  args.test:
+    if  not args.test:
         y_pred_df = pd.DataFrame(y_pred, columns=['y_pred'])
         err_df = pd.DataFrame(y_pred-y_test['target_from_order_placement'].to_numpy(), columns=['error'])
         X_test = pd.concat([X_test, y_test['target_from_order_placement'], y_pred_df,err_df], axis=1) 
-        X_test.to_csv(train_path + 'logs/test_error.csv', index=False)
         corr = X_test.corr()
         corr.to_csv(train_path + 'logs/corr_matrix.csv', index=False)
 

@@ -13,10 +13,10 @@ python data_processing.py data/eBay_ML_Challenge_Dataset_2021/eBay_ML_Challenge_
 
 
 ## train and evaluate model
-CUDA_VISIBLE_DEVICES=2,3 python model_train.py --epoch 200 --batch_size 4096 --train_file 'data/processed_data/trainSet10.csv.gz'
+CUDA_VISIBLE_DEVICES=0,1,2,3 python model_train.py --epoch 200 --batch_size 20000 --train_file 'data/processed_data/trainSet11.csv.gz'
 
 # test previous dataset without training model again : include --test True 
-CUDA_VISIBLE_DEVICES=0,1,2,3 python model_train.py --epoch 200 --batch_size 2048 --train_file 'data/processed_data/trainSet7.csv.gz' --test True
+CUDA_VISIBLE_DEVICES=0,1,2,3 python model_train.py --epoch 200 --batch_size 20000 --train_file 'data/processed_data/trainSet7.csv.gz' --test True
 
 ## generate prediction
 python predict.py --train_dir train/TrainSet8 
